@@ -20,7 +20,7 @@ ALL_GROUP_IDS = [
 
 bot = telebot.TeleBot(TOKEN)
 
-# Kamus untuk menyimpan message_id foto QRIS setiap user (agar bisa dihapus nanti)
+# Kamus untuk menyimpan message_id foto QRIS pembeli
 qris_message_tracker = {}
 
 # Fungsi untuk membuat menu tombol permanen di bawah
@@ -113,7 +113,6 @@ def process_show_qris(call):
     chat_id = call.message.chat.id
     bot.send_chat_action(chat_id, 'upload_photo')
     
-    # Teks caption tanpa format markdown yang membingungkan Telegram
     caption_text = (
         "paket hemat : price 50RB💵\n"
         "   💦Grup Hijab\n"
@@ -140,12 +139,8 @@ def process_show_qris(call):
             chat_id, 
             photo_file, 
             caption=caption_text
-            # Parameter parse_mode dihapus agar teks aman dan tidak error entities
         )
-        
-        # Simpan ID pesan foto QRIS berdasarkan chat_id pengguna agar bisa dihapus nanti
         qris_message_tracker[chat_id] = sent_photo.message_id
-        
     except Exception as e:
         bot.send_message(chat_id, f"Terjadi kesalahan: {e}")
         
@@ -171,7 +166,7 @@ def handle_payment_proof(message):
     bot.send_photo(
         ADMIN_ID, 
         photo_id, 
-        caption=f"🔔 **Bukti Pembayaran Paket VIP 8 Grup Baru!**\nDari: @{username} (ID: `{user_id}`)\nSilakan cek saldo DANA Anda.",
+        caption=f"🔔 **Bukti Pembayaran Paket VIP 8 Grup Baru!**\nDari: @{username} (ID: `{user_id}`)\nStatus: Menunggu Konfirmasi",
         parse_mode="Markdown",
         reply_markup=markup
     )
@@ -204,21 +199,27 @@ def handle_admin_action(call):
                 f"Pembayaran Diverifikasi!\n\nTerima kasih. Berikut adalah link akses eksklusif sekali pakai Anda:\n\n{links_text}\n\nCatatan: Link ini hanya bisa digunakan sekali dan akan kedaluwarsa setelah diklik."
             )
             
-            # HAPUS GAMBAR QRIS DI CHAT PEMBELI SETELAH LINK DIKIRIM
+            # Hapus QRIS di chat pembeli
             if target_user_id in qris_message_tracker:
                 try:
                     bot.delete_message(chat_id=target_user_id, message_id=qris_message_tracker[target_user_id])
-                    del qris_message_tracker[target_user_id] # Hapus dari catatan
+                    del qris_message_tracker[target_user_id]
                 except:
                     pass
             
-            # Hapus pesan bukti transfer di chat admin
+            # [JIKA DI-ACC] Foto bukti transfer TIDAK DIHAPUS, hanya statusnya yang diubah
             try:
-                bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+                bot.edit_message_caption(
+                    chat_id=call.message.chat.id,
+                    message_id=call.message.message_id,
+                    caption=call.message.caption + "\n\n✅ **STATUS: DISETUJUI (LINK TERKIRIM)**",
+                    parse_mode="Markdown",
+                    reply_markup=None
+                )
             except:
                 pass
                 
-            bot.answer_callback_query(call.id, "Berhasil! Link dikirim, QRIS & bukti dibersihkan.")
+            bot.answer_callback_query(call.id, "Berhasil! Link dikirim & bukti disimpan.")
         except Exception as e:
             bot.answer_callback_query(call.id, f"Gagal membuat link: {e}", show_alert=True)
             
@@ -226,13 +227,13 @@ def handle_admin_action(call):
         try:
             bot.send_message(target_user_id, "❌ Maaf, bukti pembayaran Anda ditolak atau tidak valid.")
             
-            # Hapus pesan bukti transfer di chat admin jika ditolak
+            # [JIKA DITOLAK] Foto bukti transfer di chat admin akan DIHAPUS OTOMATIS
             try:
                 bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
             except:
                 pass
                 
-            bot.answer_callback_query(call.id, "Pembayaran ditolak & pesan dibersihkan.")
+            bot.answer_callback_query(call.id, "Pembayaran ditolak & bukti dihapus.")
         except Exception as e:
             bot.answer_callback_query(call.id, f"Gagal: {e}", show_alert=True)
 
