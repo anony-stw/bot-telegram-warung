@@ -146,9 +146,13 @@ def process_show_qris(call):
         
     bot.answer_callback_query(call.id, "QRIS berhasil dimuat!")
 
-# 7. Menangkap foto bukti transfer dari pembeli
+# 7. Menangkap foto bukti transfer dari pembeli (Hanya berfungsi di Chat Pribadi / DM)
 @bot.message_handler(content_types=['photo'])
 def handle_payment_proof(message):
+    # Pastikan foto dikirim di chat pribadi (DM bot), BUKAN di dalam grup/channel
+    if message.chat.type != 'private':
+        return
+
     user_id = message.from_user.id
     username = message.from_user.username or message.from_user.first_name
     
