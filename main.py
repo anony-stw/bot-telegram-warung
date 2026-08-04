@@ -37,7 +37,7 @@ def send_welcome(message):
     bot.send_chat_action(message.chat.id, 'typing')
     bot.reply_to(
         message, 
-        "Halo! Selamat datang di bot WarungDosa.\n\n"
+        "Halo! Selamat Datang di bot VIP Warung Dosa.\n\n"
         "🔥 **Paket Hemat:** Dapatkan akses ke **8 Grup VIP Sekaligus** hanya dengan **Rp 50.000**!\n\n"
         "Silakan gunakan tombol menu di bawah untuk mulai:", 
         parse_mode="Markdown", 
@@ -55,7 +55,7 @@ def handle_buy_menu(message):
     
     bot.send_message(
         chat_id,
-        "Anda memilih **Paket VIP 8 Grup Sekaligus (Rp 50.000)**.\n\nKlik tombol di bawah untuk menampilkan QR Code pembayaran:",
+        "🟢Anda memilih **Paket VIP 8 Grup Sekaligus (Rp 50.000)**.\n\nKlik tombol di bawah untuk menampilkan QR Code pembayaran:",
         parse_mode="Markdown",
         reply_markup=markup
     )
