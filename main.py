@@ -200,7 +200,7 @@ def handle_admin_action(call):
             # Kirim link grup ke pembeli
             bot.send_message(
                 target_user_id,
-                f"Pembayaran Diverifikasi!\n\nTerima kasih. Berikut adalah link akses eksklusif sekali pakai Anda:\n\n{links_text}\n\nCatatan: Link ini hanya bisa digunakan sekali dan akan kedaluwarsa setelah diklik."
+                f"Pembayaran Diverifikasi✅\n\nTerima kasih. Berikut adalah link akses eksklusif sekali pakai Anda:\n\n{links_text}\n\n⚠️Catatan: Link ini hanya bisa digunakan sekali dan akan kedaluwarsa setelah diklik."
             )
             
             # Hapus QRIS di chat pembeli
