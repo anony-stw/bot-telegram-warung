@@ -27,7 +27,7 @@ qris_message_tracker = {}
 def main_menu():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add(KeyboardButton("🛒 Beli Paket VIP 8 Grup (Rp 50.000)"))
-    markup.add(KeyboardButton("⭐ Testimoni / Ulasan"), KeyboardButton("❓ Bantuan / FAQ"))
+    markup.add(KeyboardButton("⭐ Testimoni"), KeyboardButton("❓ Bantuan / FAQ"))
     markup.add(KeyboardButton("📞 Hubungi Admin"))
     return markup
 
@@ -61,13 +61,13 @@ def handle_buy_menu(message):
     )
 
 # 3. Menangani tombol menu permanen: "⭐ Testimoni / Ulasan"
-@bot.message_handler(func=lambda message: message.text == "⭐ Testimoni / Ulasan")
+@bot.message_handler(func=lambda message: message.text == "⭐ Testimoni")
 def handle_testimoni(message):
     chat_id = message.chat.id
     bot.send_chat_action(chat_id, 'typing')
     
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("🔗 Buka Channel Testimoni", url="https://t.me/testiwarungdosa"))
+    markup.add(InlineKeyboardButton("🔗 Buka Channel Testimoni", url="https://t.me/testiwarungdosaa"))
     
     bot.send_message(
         chat_id,
