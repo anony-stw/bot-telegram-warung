@@ -38,7 +38,7 @@ def send_welcome(message):
     bot.reply_to(
         message, 
         "Halo! Selamat Datang di bot VIP Warung Dosa.\n\n"
-        "🔥 **Paket Hemat:** Dapatkan akses ke **8 Grup VIP Sekaligus** hanya dengan **Rp 50.000**!\n\n"
+        "🔥 **Paket Hemat:** Dapatkan akses ke **8 Grup VIP ** hanya dengan **Rp 50.000**!\n\n"
         "Silakan gunakan tombol menu di bawah untuk mulai:", 
         parse_mode="Markdown", 
         reply_markup=main_menu()
@@ -71,7 +71,7 @@ def handle_testimoni(message):
     
     bot.send_message(
         chat_id,
-        "⭐ **Testimoni Pelanggan WarungDosa**\n\n"
+        "⭐ **Testimoni Member VIP WarungDosa**\n\n"
         "Ingin melihat bukti screenshot pembayaran dan kepuasan member lain yang sudah bergabung?\n\n"
         "Silakan klik tombol di bawah untuk melihat kumpulan testimoni lengkap kami:",
         parse_mode="Markdown",
