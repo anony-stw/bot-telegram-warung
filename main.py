@@ -1,7 +1,6 @@
 import telebot
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 import threading
-from PIL import Image, ImageDraw, ImageFont
 import os
 import sqlite3
 from datetime import datetime, timezone, timedelta
