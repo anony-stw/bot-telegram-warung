@@ -1,54 +1,12 @@
 import telebot
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+import time
 import threading
-import os
-import sqlite3
-from datetime import datetime, timezone, timedelta
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
-# Konfigurasi Token dan Admin ID
-TOKEN = "8804489343:AAfHt90a45H0u6mTx38p3eSe-x0uCzT2Th4"
+TOKEN = "8804489343:AAFht9Da4jH0u6mTx38p3eSE-xOuCzT2Th4"
 ADMIN_ID = 8714195568
 
-bot = telebot.TeleBot(TOKEN)
-
-# Menentukan Zona Waktu WIB (UTC+7)
-WIB = timezone(timedelta(hours=7))
-
-# Inisialisasi Database SQLite
-def init_db():
-    conn = sqlite3.connect('database_transaksi.db', check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS transaksi (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            username TEXT,
-            nominal INTEGER,
-            tanggal TEXT,
-            waktu_lengkap TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# Fungsi untuk mencatat transaksi dengan waktu WIB yang akurat
-def catat_transaksi(user_id, username, nominal):
-    conn = sqlite3.connect('database_transaksi.db', check_same_thread=False)
-    cursor = conn.cursor()
-    
-    # Mengambil waktu sekarang berdasarkan zona waktu WIB (UTC+7)
-    waktu_sekarang = datetime.now(WIB)
-    tanggal_hari_ini = waktu_sekarang.strftime('%Y-%m-%d')
-    waktu_lengkap = waktu_sekarang.strftime('%Y-%m-%d %H:%M:%S')
-    
-    cursor.execute("INSERT INTO transaksi (user_id, username, nominal, tanggal, waktu_lengkap) VALUES (?, ?, ?, ?, ?)",
-                   (user_id, username, nominal, tanggal_hari_ini, waktu_lengkap))
-    conn.commit()
-    conn.close()
-
-# Daftar ID Grup atau Channel Telegram Anda
+# Daftar ID Grup atau Channel Telegram Anda 
 ALL_GROUP_IDS = [
     -1003721629607,
     -1003646177202,
@@ -60,142 +18,228 @@ ALL_GROUP_IDS = [
     -1003853297361
 ]
 
-# Fungsi Watermark Foto
-def apply_watermark(input_path, output_path, watermark_text):
-    original_image = Image.open(input_path).convert("RGBA")
-    txt_layer = Image.new("RGBA", original_image.size, (255, 255, 255, 0))
-    
-    try:
-        font = ImageFont.load_default()
-    except:
-        font = ImageFont.load_default()
-        
-    draw = ImageDraw.Draw(txt_layer)
-    width, height = original_image.size
-    text_position = (width - 150, height - 30) 
-    draw.text(text_position, watermark_text, fill=(255, 255, 255, 180), font=font)
-    
-    watermarked = Image.alpha_composite(original_image, txt_layer)
-    watermarked.convert("RGB").save(output_path, "JPEG")
+bot = telebot.TeleBot(TOKEN)
 
-# Handler Tombol Konfirmasi Admin (Approve / Reject)
-@bot.callback_query_handler(func=lambda call: True)
-def callback_handler(call):
-    if call.from_user.id != ADMIN_ID:
-        bot.answer_callback_query(call.id, "Anda bukan admin!", show_alert=True)
-        return
+# Kamus untuk menyimpan message_id foto QRIS pembeli
+qris_message_tracker = {}
 
-    data = call.data
-    if data.startswith("approve_"):
-        user_id = int(data.split("_")[1])
-        nominal_transaksi = 50000 
-        username_pembeli = f"User_{user_id}"
-        
-        # Catat ke database dengan waktu WIB
-        catat_transaksi(user_id, username_pembeli, nominal_transaksi)
-        
-        bot.answer_callback_query(call.id, "Pembayaran disetujui dan tercatat!")
-        bot.send_message(user_id, "✅ Pembayaran Anda telah dikonfirmasi oleh Admin! Silakan nikmati aksesnya.")
-        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=f"{call.message.caption}\n\nstatus: ✅ DISETUJUI")
-        
-    elif data.startswith("reject_"):
-        user_id = int(data.split("_")[1])
-        bot.answer_callback_query(call.id, "Pembayaran ditolak.")
-        bot.send_message(user_id, "❌ Mohon maaf, bukti pembayaran Anda ditolak oleh Admin. Silakan hubungi admin.")
-        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=f"{call.message.caption}\n\nstatus: ❌ DITOLAK")
+# Fungsi untuk membuat menu tombol permanen di bawah
+def main_menu():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(KeyboardButton("🛒 Beli Paket VIP 8 Grup (Rp 50.000)"))
+    markup.add(KeyboardButton("⭐ Testimoni / Ulasan"), KeyboardButton("❓ Bantuan / FAQ"))
+    markup.add(KeyboardButton("📞 Hubungi Admin"))
+    return markup
 
-# Fitur Laporan Keuangan Khusus Admin (/laporan)
-@bot.message_handler(commands=['laporan'])
-def laporan_keuangan(message):
-    if message.chat.id != ADMIN_ID or message.chat.type != 'private':
-        return
-
-    conn = sqlite3.connect('database_transaksi.db', check_same_thread=False)
-    cursor = conn.cursor()
-
-    waktu_sekarang = datetime.now(WIB)
-    hari_ini = waktu_sekarang.strftime('%Y-%m-%d')
-    cursor.execute("SELECT SUM(nominal), COUNT(*) FROM transaksi WHERE tanggal = ?", (hari_ini,))
-    res_hari = cursor.fetchone()
-    total_hari = res_hari[0] or 0
-    count_hari = res_hari[1] or 0
-
-    bulan_ini = waktu_sekarang.strftime('%Y-%m')
-    cursor.execute("SELECT SUM(nominal), COUNT(*) FROM transaksi WHERE tanggal LIKE ?", (f"{bulan_ini}%",))
-    res_bulan = cursor.fetchone()
-    total_bulan = res_bulan[0] or 0
-    count_bulan = res_bulan[1] or 0
-
-    conn.close()
-
-    teks_laporan = (
-        f"📊 **LAPORAN KEUANGAN BOT** 📊\n\n"
-        f"📅 **Hari Ini ({hari_ini}):**\n"
-        f"- Total Transaksi: {count_hari} pembeli\n"
-        f"- Pendapatan: Rp {total_hari:,}\n\n"
-        f"📆 **Bulan Ini ({bulan_ini}):**\n"
-        f"- Total Transaksi: {count_bulan} pembeli\n"
-        f"- Pendapatan: Rp {total_bulan:,}"
-    )
-    
-    bot.reply_to(message, teks_laporan, parse_mode="Markdown")
-
-# Handler Foto (Watermark & Bukti Bayar)
-@bot.message_handler(content_types=['photo'])
-def handle_all_photos(message):
-    user_id = message.from_user.id
-    username = message.from_user.username or message.from_user.first_name
-
-    if user_id == ADMIN_ID and message.chat.type == 'private':
-        bot.reply_to(message, "⏳ Sedang memproses watermark pada foto...")
-        try:
-            file_info = bot.get_file(message.photo[-1].file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
-            
-            input_file = "input_temp.jpg"
-            output_file = "output_watermarked.jpg"
-            
-            with open(input_file, 'wb') as f:
-                f.write(downloaded_file)
-                
-            apply_watermark(input_file, output_file, "@WarungDosa")
-            
-            with open(output_file, 'rb') as photo_result:
-                bot.send_photo(
-                    ADMIN_ID, 
-                    photo_result, 
-                    caption="✅ Berhasil! Foto sudah diberi watermark otomatis."
-                )
-                
-            os.remove(input_file)
-            os.remove(output_file)
-        except Exception as e:
-            bot.reply_to(message, f"❌ Terjadi kesalahan saat watermark: {e}")
-        return
-
-    if message.chat.type == 'private':
-        markup = InlineKeyboardMarkup()
-        btn_approve = InlineKeyboardButton("✅ Setujui & Catat Transaksi", callback_data=f"approve_{user_id}")
-        btn_reject = InlineKeyboardButton("❌ Tolak", callback_data=f"reject_{user_id}")
-        markup.add(btn_approve, btn_reject)
-        
-        photo_id = message.photo[-1].file_id
-        
-        bot.send_photo(
-            ADMIN_ID, 
-            photo_id, 
-            caption=f"🔔 **Bukti Pembayaran Paket VIP!**\nDari: @{username} (ID: `{user_id}`)\nStatus: Menunggu Konfirmasi",
-            parse_mode="Markdown",
-            reply_markup=markup
-        )
-        
-        bot.reply_to(message, "Bukti pembayaran terkirim ke Admin. Mohon tunggu verifikasi ya!")
-        return
-
+# 1. Saat user mengetik /start atau menyapa bot
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    if message.chat.type == 'private':
-        bot.reply_to(message, "Halo! Selamat datang di bot layanan WarungDosa. Silakan kirimkan bukti pembayaran Anda di sini.")
+    bot.send_chat_action(message.chat.id, 'typing')
+    bot.reply_to(
+        message, 
+        "Halo! Selamat datang di bot WarungDosa.\n\n"
+        "🔥 **Paket Hemat:** Dapatkan akses ke **8 Grup VIP Sekaligus** hanya dengan **Rp 50.000**!\n\n"
+        "Silakan gunakan tombol menu di bawah untuk mulai:", 
+        parse_mode="Markdown", 
+        reply_markup=main_menu()
+    )
 
-print("Bot sedang berjalan...")
+# 2. Menangani tombol menu permanen: "Beli Paket"
+@bot.message_handler(func=lambda message: message.text == "🛒 Beli Paket VIP 8 Grup (Rp 50.000)")
+def handle_buy_menu(message):
+    chat_id = message.chat.id
+    bot.send_chat_action(chat_id, 'typing')
+    
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("💳 Tampilkan QRIS Pembayaran", callback_data="show_qris"))
+    
+    bot.send_message(
+        chat_id,
+        "Anda memilih **Paket VIP 8 Grup Sekaligus (Rp 50.000)**.\n\nKlik tombol di bawah untuk menampilkan QR Code pembayaran:",
+        parse_mode="Markdown",
+        reply_markup=markup
+    )
+
+# 3. Menangani tombol menu permanen: "⭐ Testimoni / Ulasan"
+@bot.message_handler(func=lambda message: message.text == "⭐ Testimoni / Ulasan")
+def handle_testimoni(message):
+    chat_id = message.chat.id
+    bot.send_chat_action(chat_id, 'typing')
+    
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("🔗 Buka Channel Testimoni", url="https://t.me/testiwarungdosa"))
+    
+    bot.send_message(
+        chat_id,
+        "⭐ **Testimoni Pelanggan WarungDosa**\n\n"
+        "Ingin melihat bukti screenshot pembayaran dan kepuasan member lain yang sudah bergabung?\n\n"
+        "Silakan klik tombol di bawah untuk melihat kumpulan testimoni lengkap kami:",
+        parse_mode="Markdown",
+        reply_markup=markup
+    )
+
+# 4. Menangani tombol menu permanen: "Bantuan / FAQ"
+@bot.message_handler(func=lambda message: message.text == "❓ Bantuan / FAQ")
+def handle_faq(message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    bot.reply_to(
+        message,
+        "💡 **Panduan & FAQ:**\n\n"
+        "1. Klik tombol **'🛒 Beli Paket VIP 8 Grup'** di bawah.\n"
+        "2. Klik tombol QRIS yang muncul, lalu scan dan bayar tepat **Rp 50.000**.\n"
+        "3. **Kirim screenshot bukti transfer** ke chat ini.\n"
+        "4. Admin akan memverifikasi, dan link khusus sekali pakai akan dikirim otomatis!\n\n"
+        "⚠️ *Catatan: Foto QRIS akan otomatis terhapus setelah pembayaran Anda disetujui admin.*"
+    )
+
+# 5. Menangani tombol menu permanen: "Hubungi Admin"
+@bot.message_handler(func=lambda message: message.text == "📞 Hubungi Admin")
+def handle_contact_admin(message):
+    chat_id = message.chat.id
+    bot.send_chat_action(chat_id, 'typing')
+    
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("💬 Chat Admin Sekarang", url="https://t.me/Arauxss"))
+    
+    bot.send_message(
+        chat_id,
+        "💬 Silakan hubungi Admin kami jika Anda mengalami kendala seputar pembayaran atau akses grup:",
+        reply_markup=markup
+    )
+
+# 6. Ketika tombol "Tampilkan QRIS" diklik
+@bot.callback_query_handler(func=lambda call: call.data == "show_qris")
+def process_show_qris(call):
+    chat_id = call.message.chat.id
+    bot.send_chat_action(chat_id, 'upload_photo')
+    
+    caption_text = (
+        "paket hemat : price 50RB💵\n"
+        "   💦Grup Hijab\n"
+        "   💦Grup Random\n"
+        "   💦Grup Ome Tv\n"
+        "   💦Grup Stw\n"
+        "   💦Grup Ngintip\n"
+        "   💦Grup JJ Tiktok\n"
+        "   💦Grup Backup\n"
+        "   💦Grup Boc*l (students)\n\n"
+        "SETELAH JOIN TIDAK DIKENAKAN BIAYA LAGI!!!\n\n"
+        "Silakan transfer tepat Rp 50.000 lalu kirim screenshot bukti transfer ke chat ini."
+    )
+    
+    try:
+        photo_file = open('qris.jpg', 'rb')
+    except Exception:
+        bot.send_message(chat_id, "Gagal memuat gambar QRIS. Pastikan file 'qris.jpg' ada di folder yang sama.")
+        bot.answer_callback_query(call.id, "Gagal memuat QRIS!")
+        return
+
+    try:
+        sent_photo = bot.send_photo(
+            chat_id, 
+            photo_file, 
+            caption=caption_text
+        )
+        qris_message_tracker[chat_id] = sent_photo.message_id
+    except Exception as e:
+        bot.send_message(chat_id, f"Terjadi kesalahan: {e}")
+        
+    bot.answer_callback_query(call.id, "QRIS berhasil dimuat!")
+
+# 7. Menangkap foto bukti transfer dari pembeli (Hanya berfungsi di Chat Pribadi / DM)
+@bot.message_handler(content_types=['photo'])
+def handle_payment_proof(message):
+    # Pastikan foto dikirim di chat pribadi (DM bot), BUKAN di dalam grup/channel
+    if message.chat.type != 'private':
+        return
+
+    user_id = message.from_user.id
+    username = message.from_user.username or message.from_user.first_name
+    
+    if user_id == ADMIN_ID:
+        bot.reply_to(message, "Itu adalah foto dari Anda (Admin).")
+        return
+
+    markup = InlineKeyboardMarkup()
+    btn_approve = InlineKeyboardButton("✅ Setujui & Buat Link Unik", callback_data=f"approve_{user_id}")
+    btn_reject = InlineKeyboardButton("❌ Tolak", callback_data=f"reject_{user_id}")
+    markup.add(btn_approve, btn_reject)
+    
+    photo_id = message.photo[-1].file_id
+    
+    bot.send_photo(
+        ADMIN_ID, 
+        photo_id, 
+        caption=f"🔔 **Bukti Pembayaran Paket VIP 8 Grup Baru!**\nDari: @{username} (ID: `{user_id}`)\nStatus: Menunggu Konfirmasi",
+        parse_mode="Markdown",
+        reply_markup=markup
+    )
+    
+    bot.reply_to(message, "Bukti pembayaran terkirim ke Admin. Mohon tunggu verifikasi ya!")
+
+# 8. Aksi Admin ketika menekan tombol Setujui / Tolak
+@bot.callback_query_handler(func=lambda call: call.data.startswith("approve_") or call.data.startswith("reject_"))
+def handle_admin_action(call):
+    if call.from_user.id != ADMIN_ID:
+        bot.answer_callback_query(call.id, "Akses ditolak!", show_alert=True)
+        return
+        
+    parts = call.data.split("_")
+    action = parts[0]
+    target_user_id = int(parts[1])
+    
+    if action == "approve":
+        try:
+            generated_links = []
+            for group_id in ALL_GROUP_IDS:
+                invite = bot.create_chat_invite_link(chat_id=group_id, member_limit=1)
+                generated_links.append(invite.invite_link)
+            
+            links_text = "\n".join([f"- {link}" for link in generated_links])
+            
+            # Kirim link grup ke pembeli
+            bot.send_message(
+                target_user_id,
+                f"Pembayaran Diverifikasi!\n\nTerima kasih. Berikut adalah link akses eksklusif sekali pakai Anda:\n\n{links_text}\n\nCatatan: Link ini hanya bisa digunakan sekali dan akan kedaluwarsa setelah diklik."
+            )
+            
+            # Hapus QRIS di chat pembeli
+            if target_user_id in qris_message_tracker:
+                try:
+                    bot.delete_message(chat_id=target_user_id, message_id=qris_message_tracker[target_user_id])
+                    del qris_message_tracker[target_user_id]
+                except:
+                    pass
+            
+            # [JIKA DI-ACC] Foto bukti transfer TIDAK DIHAPUS, hanya statusnya yang diubah
+            try:
+                bot.edit_message_caption(
+                    chat_id=call.message.chat.id,
+                    message_id=call.message.message_id,
+                    caption=call.message.caption + "\n\n✅ **STATUS: DISETUJUI (LINK TERKIRIM)**",
+                    parse_mode="Markdown",
+                    reply_markup=None
+                )
+            except:
+                pass
+                
+            bot.answer_callback_query(call.id, "Berhasil! Link dikirim & bukti disimpan.")
+        except Exception as e:
+            bot.answer_callback_query(call.id, f"Gagal membuat link: {e}", show_alert=True)
+            
+    elif action == "reject":
+        try:
+            bot.send_message(target_user_id, "❌ Maaf, bukti pembayaran Anda ditolak atau tidak valid.")
+            
+            # [JIKA DITOLAK] Foto bukti transfer di chat admin akan DIHAPUS OTOMATIS
+            try:
+                bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+            except:
+                pass
+                
+            bot.answer_callback_query(call.id, "Pembayaran ditolak & bukti dihapus.")
+        except Exception as e:
+            bot.answer_callback_query(call.id, f"Gagal: {e}", show_alert=True)
+
+print("Bot lengkap sedang berjalan...")
 bot.infinity_polling()
